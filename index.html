@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>킬링파트 무한반복 (V2)</title>
+    <title>킬링파트 무한반복 (최종)</title>
     <style>
         body { background: #121212; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
         input { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #222; color: white; width: 85%; margin-bottom: 15px; font-size: 16px; }
@@ -13,27 +13,27 @@
         .time-input-group input { width: 80px; text-align: center; margin-bottom: 0; }
         button { padding: 15px 40px; border-radius: 30px; border: none; background: #ff0000; color: white; font-weight: bold; font-size: 18px; box-shadow: 0 4px 15px rgba(255,0,0,0.3); }
         #player-container { margin-top: 25px; border-radius: 15px; overflow: hidden; display: none; background: #000; }
-        .guide { font-size: 13px; color: #888; margin-top: 10px; }
+        #status { font-size: 14px; color: #00ff00; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <h3>YouTube 구간 반복기 v2</h3>
+    <h3>YouTube 구간 반복기</h3>
     
     <input type="text" id="videoUrl" placeholder="유튜브 링크를 붙여넣으세요">
     
     <div class="time-box">
         <div class="time-input-group">
-            <label>시작 (예: 2:40)</label>
+            <label>시작 (분:초)</label>
             <input type="text" id="startStr" value="2:40">
         </div>
         <div class="time-input-group">
-            <label>종료 (예: 2:59)</label>
+            <label>종료 (분:초)</label>
             <input type="text" id="endStr" value="2:59">
         </div>
     </div>
     
     <button onclick="loadAndPlay()">반복 시작!</button>
-    <p class="guide">※ 분:초 형식으로 입력하면 자동으로 계산됩니다.</p>
+    <div id="status"></div>
     
     <div id="player-container">
         <div id="player"></div>
@@ -43,39 +43,55 @@
     <script>
         let player;
         let loopInterval;
+        let isFirstPlay = true;
 
-        // "2:40" 형식을 초 단위로 바꿔주는 마법의 함수
         function parseTimeToSeconds(timeStr) {
             if (!timeStr.includes(':')) return parseFloat(timeStr) || 0;
             const parts = timeStr.split(':');
-            const minutes = parseFloat(parts[0]) || 0;
-            const seconds = parseFloat(parts[1]) || 0;
-            return (minutes * 60) + seconds;
+            return (parseFloat(parts[0]) * 60) + parseFloat(parts[1]);
+        }
+
+        function extractVideoId(url) {
+            const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[7].length == 11) ? match[7] : url;
         }
 
         function loadAndPlay() {
             const url = document.getElementById('videoUrl').value;
-            const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+            const videoId = extractVideoId(url);
+            isFirstPlay = true; // 새 노래를 불러올 때 플래그 초기화
             
             if (!player) {
                 player = new YT.Player('player', {
                     height: '240', width: '100%', videoId: videoId,
-                    playerVars: { 'playsinline': 1 },
-                    events: { 'onStateChange': onPlayerStateChange }
+                    playerVars: { 'playsinline': 1, 'autoplay': 1 },
+                    events: { 'onStateChange': onPlayerStateChange, 'onReady': (e) => e.target.playVideo() }
                 });
                 document.getElementById('player-container').style.display = 'block';
             } else {
                 player.loadVideoById(videoId);
             }
+            document.getElementById('status').innerText = "로딩 중...";
         }
 
         function onPlayerStateChange(event) {
             if (event.data == YT.PlayerState.PLAYING) {
+                const start = parseTimeToSeconds(document.getElementById('startStr').value);
+                const end = parseTimeToSeconds(document.getElementById('endStr').value);
+
+                // [핵심!] 처음 재생될 때 바로 시작 시간으로 점프
+                if (isFirstPlay) {
+                    player.seekTo(start);
+                    isFirstPlay = false;
+                    document.getElementById('status').innerText = "구간 반복 작동 중 🔄";
+                }
+
                 if (loopInterval) clearInterval(loopInterval);
                 loopInterval = setInterval(() => {
-                    const start = parseTimeToSeconds(document.getElementById('startStr').value);
-                    const end = parseTimeToSeconds(document.getElementById('endStr').value);
-                    if (player.getCurrentTime() >= end) {
+                    const currentTime = player.getCurrentTime();
+                    // 종료 시간에 도달하거나, 현재 시간이 시작 시간보다 한참 전이면 다시 점프
+                    if (currentTime >= end || currentTime < start - 1) {
                         player.seekTo(start);
                     }
                 }, 500);
