@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>킬링파트 무한반복</title>
+    <style>
+        body { background: #121212; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
+        input { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #222; color: white; width: 80%; margin-bottom: 10px; }
+        .time-box { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .time-box input { width: 60px; text-align: center; }
+        button { padding: 15px 30px; border-radius: 30px; border: none; background: #ff0000; color: white; font-weight: bold; font-size: 16px; }
+        #player-container { margin-top: 20px; border-radius: 15px; overflow: hidden; display: none; }
+    </style>
+</head>
+<body>
+    <h3>YouTube 구간 반복기</h3>
+    <input type="text" id="videoUrl" placeholder="유튜브 링크를 붙여넣으세요">
+    <div class="time-box">
+        <div>시작(초): <input type="number" id="start" value="160"></div>
+        <div>종료(초): <input type="number" id="end" value="179"></div>
+    </div>
+    <button onclick="loadAndPlay()">반복 시작!</button>
+    
+    <div id="player-container">
+        <div id="player"></div>
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        let player;
+        let loopInterval;
+
+        function loadAndPlay() {
+            const url = document.getElementById('videoUrl').value;
+            const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+            
+            if (!player) {
+                player = new YT.Player('player', {
+                    height: '200', width: '100%', videoId: videoId,
+                    events: { 'onStateChange': onPlayerStateChange }
+                });
+                document.getElementById('player-container').style.display = 'block';
+            } else {
+                player.loadVideoById(videoId);
+            }
+        }
+
+        function onPlayerStateChange(event) {
+            if (event.data == YT.PlayerState.PLAYING) {
+                if (loopInterval) clearInterval(loopInterval);
+                loopInterval = setInterval(() => {
+                    const start = parseFloat(document.getElementById('start').value);
+                    const end = parseFloat(document.getElementById('end').value);
+                    if (player.getCurrentTime() >= end) {
+                        player.seekTo(start);
+                    }
+                }, 500);
+            }
+        }
+    </script>
+</body>
+</html>
